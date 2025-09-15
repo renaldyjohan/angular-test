@@ -5,12 +5,14 @@
 
   <div class="gallery">
     <div *ngFor="let img of images" class="card">
-      <img [src]="apiUrl + '/' + img.id" [alt]="img.filename" (click)="openPreview(img)" />
-      <div class="info">
-        <h3>{{ img.title || img.filename }}</h3>
-        <p>{{ formatSize(img.length) }} • {{ formatDate(img.uploadDate) }}</p>
-        <div class="tags" *ngIf="img.tags?.length">
-          <span class="chip" *ngFor="let tag of img.tags">{{ tag }}</span>
+      <div>
+        <img [src]="apiUrl + '/' + img.id" [alt]="img.filename" (click)="openPreview(img)" />
+        <div class="info">
+          <h3>{{ img.title || img.filename }}</h3>
+          <p>{{ formatSize(img.length) }} • {{ formatDate(img.uploadDate) }}</p>
+          <div class="tags" *ngIf="img.tags?.length">
+            <span class="chip" *ngFor="let tag of img.tags">{{ tag }}</span>
+          </div>
         </div>
       </div>
       <div class="actions">
