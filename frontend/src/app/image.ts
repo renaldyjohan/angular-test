@@ -3,33 +3,28 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../environments/environment';
+import { ApiResponse, ImageFile } from './models/image.model';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class ImageService {
   private baseUrl = environment.apiUrl;
 
   constructor(private http: HttpClient) {}
 
-  // Fetch all images
-  getImages(): Observable<any[]> {
-    return this.http.get<any>(this.baseUrl).pipe(
-      map(res => res.data || res)  
-    );
+  getImages(): Observable<ImageFile[]> {
+    return this.http.get<ApiResponse<ImageFile[]>>(this.baseUrl).pipe(map((res) => res.data));
   }
 
-  // Upload image
-  uploadImage(formData: FormData): Observable<any> {
-    return this.http.post(`${this.baseUrl}/upload`, formData);
+  uploadImage(formData: FormData): Observable<ApiResponse<ImageFile>> {
+    return this.http.post<ApiResponse<ImageFile>>(`${this.baseUrl}/upload`, formData);
   }
 
-  // Delete image
-  deleteImage(id: string): Observable<any> {
-    return this.http.delete(`${this.baseUrl}/${id}`);
+  deleteImage(id: string): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.baseUrl}/${id}`);
   }
 
-  // Download image
   downloadImage(id: string): Observable<Blob> {
     return this.http.get(`${this.baseUrl}/${id}`, { responseType: 'blob' });
   }

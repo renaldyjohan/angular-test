@@ -1,24 +1,85 @@
 <div class="page-wrapper">
+  <div class="upload-trigger">
+    <button (click)="openUpload()">＋ Upload Image</button>
+  </div>
+
   <div class="gallery">
     <div *ngFor="let img of images" class="card">
       <img [src]="apiUrl + '/' + img.id" [alt]="img.filename" (click)="openPreview(img)" />
-
       <div class="info">
-        <h3>{{ img.filename }}</h3>
+        <h3>{{ img.title || img.filename }}</h3>
         <p>{{ formatSize(img.length) }} • {{ formatDate(img.uploadDate) }}</p>
+        <div class="tags" *ngIf="img.tags?.length">
+          <span class="chip" *ngFor="let tag of img.tags">{{ tag }}</span>
+        </div>
       </div>
-
       <div class="actions">
         <button class="delete" (click)="delete(img.id)">Delete</button>
         <button class="download" (click)="download(img.id, img.filename)">Download</button>
       </div>
     </div>
   </div>
+
   <div class="modal" *ngIf="selectedImage" (click)="closePreview()">
     <div class="modal-content" (click)="$event.stopPropagation()">
       <button class="close" (click)="closePreview()">×</button>
       <img [src]="selectedImage.src" [alt]="selectedImage.filename" />
-      <p>{{ selectedImage.filename }}</p>
+      <h3>{{ selectedImage.title || selectedImage.filename }}</h3>
+      <p><strong>Filename:</strong> {{ selectedImage.filename }}</p>
+      <p><strong>Description:</strong> {{ selectedImage.description || '—' }}</p>
+      <p>
+        <strong>Tags:</strong>
+        {{ selectedImage.tags.length ? selectedImage.tags.join(', ') : '—' }}
+      </p>
+      <p><strong>Size:</strong> {{ formatSize(selectedImage.length) }}</p>
+      <p><strong>Uploaded:</strong> {{ formatDate(selectedImage.uploadDate) }}</p>
+    </div>
+  </div>
+
+  <div class="modal" *ngIf="showUpload" (click)="closeUpload()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <button class="close" (click)="closeUpload()">×</button>
+      <h3>Upload Image</h3>
+
+      <div
+        class="dropzone"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)"
+        (drop)="onDrop($event)"
+        [class.dragging]="isDragging"
+      >
+        <ng-container *ngIf="!previewUrl; else previewInside">
+          <p>Drag & Drop an image here or click to browse</p>
+          <input type="file" accept="image/*" (change)="onFileSelected($event)" />
+        </ng-container>
+        <ng-template #previewInside>
+          <div class="preview-wrapper">
+            <img [src]="previewUrl" [alt]="formData.title || 'Preview'" />
+            <button type="button" class="cancel-btn" (click)="cancelSelectedFile()">
+              ✕ Cancel
+            </button>
+          </div>
+        </ng-template>
+      </div>
+
+      <form>
+        <label>
+          Title:
+          <input type="text" [(ngModel)]="formData.title" name="title" />
+        </label>
+        <label>
+          Description:
+          <textarea [(ngModel)]="formData.description" name="description"></textarea>
+        </label>
+        <label>
+          Tags (comma separated):
+          <input type="text" [(ngModel)]="formData.tags" name="tags" />
+        </label>
+      </form>
+
+      <button class="upload-btn" [disabled]="loading || !selectedFile" (click)="upload()">
+        {{ loading ? 'Uploading...' : 'Upload' }}
+      </button>
     </div>
   </div>
 </div>

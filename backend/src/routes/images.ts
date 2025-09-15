@@ -1,57 +1,84 @@
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { ObjectId } from "mongodb";
 import { upload } from "../services/storage";
 import { getBucket, getDb } from "../services/mongo";
 import { Readable } from "stream";
+import { HttpError } from "../types/errors";
 
 const router = Router();
 
-router.post("/upload", upload.single("file"), async (req, res, next) => {
-  try {
-    if (!req.file) {
-      const error: any = new Error("No file uploaded");
-      error.status = 400;
-      throw error;
-    }
+router.post(
+  "/upload",
+  upload.single("file"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.file) {
+        const error: HttpError = new Error("No file uploaded");
+        error.status = 400;
+        throw error;
+      }
 
-    const bucket = getBucket();
-    const readable = Readable.from(req.file.buffer);
+      const { title, description, tags } = req.body;
 
-    const uploadStream = bucket.openUploadStream(req.file.originalname, {
-      contentType: req.file.mimetype,
-      metadata: { originalName: req.file.originalname }
-    });
+      const bucket = getBucket();
+      const readable = Readable.from(req.file.buffer);
 
-    readable.pipe(uploadStream)
-      .on("error", (err) => next(err))
-      .on("finish", async () => {
-        const fileId = uploadStream.id;
-        await getDb().collection("imageMetadata").insertOne({
-          fileId,
-          filename: req.file!.originalname,
-          contentType: req.file!.mimetype,
-          size: req.file!.size,
-          uploadDate: new Date()
-        });
-
-        res.status(201).json({
-          success: true,
-          message: "File uploaded successfully",
-          data: {
-            id: fileId,
-            filename: req.file!.originalname,
-            contentType: req.file!.mimetype
-          }
-        });
+      const uploadStream = bucket.openUploadStream(req.file.originalname, {
+        contentType: req.file.mimetype,
+        metadata: { originalName: req.file.originalname },
       });
-  } catch (err) {
-    next(err);
-  }
-});
 
-router.get("/", async (req, res, next) => {
+      readable
+        .pipe(uploadStream)
+        .on("error", (err) => next(err))
+        .on("finish", async () => {
+          const fileId = uploadStream.id;
+          await getDb().collection("imageMetadata").insertOne({
+            fileId,
+            filename: req.file!.originalname,
+            contentType: req.file!.mimetype,
+            size: req.file!.size,
+            uploadDate: new Date(),
+            title,
+            description,
+            tags: tags ? tags.split(",").map((t: string) => t.trim()) : [],
+          });
+
+          res.status(201).json({
+            success: true,
+            message: "File uploaded successfully",
+            data: {
+              id: fileId,
+              filename: req.file!.originalname,
+              title,
+              description,
+              tags,
+            },
+          });
+        });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.get("/", async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const files = await getDb().collection("images.files").find().toArray();
+    const files = await getDb()
+      .collection("images.files")
+      .aggregate([
+        {
+          $lookup: {
+            from: "imageMetadata",
+            localField: "_id",
+            foreignField: "fileId",
+            as: "meta",
+          },
+        },
+        { $unwind: { path: "$meta", preserveNullAndEmptyArrays: true } },
+      ])
+      .toArray();
+
     res.json({
       success: true,
       message: "Files retrieved successfully",
@@ -61,19 +88,24 @@ router.get("/", async (req, res, next) => {
         length: f.length,
         contentType: f.contentType,
         uploadDate: f.uploadDate,
-      }))
+        title: f.meta?.title,
+        description: f.meta?.description,
+        tags: f.meta?.tags,
+      })),
     });
   } catch (err) {
     next(err);
   }
 });
 
-router.get("/:id", async (req, res, next) => {
+router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = new ObjectId(req.params.id);
-    const fileDoc = await getDb().collection("images.files").findOne({ _id: id });
+    const fileDoc = await getDb()
+      .collection("images.files")
+      .findOne({ _id: id });
     if (!fileDoc) {
-      const error: any = new Error("File not found");
+      const error: HttpError = new Error("File not found");
       error.status = 404;
       throw error;
     }
@@ -86,19 +118,22 @@ router.get("/:id", async (req, res, next) => {
   }
 });
 
-router.delete("/:id", async (req, res, next) => {
-  try {
-    const id = new ObjectId(req.params.id);
-    await getBucket().delete(id);
-    await getDb().collection("imageMetadata").deleteOne({ fileId: id });
+router.delete(
+  "/:id",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = new ObjectId(req.params.id);
+      await getBucket().delete(id);
+      await getDb().collection("imageMetadata").deleteOne({ fileId: id });
 
-    res.json({
-      success: true,
-      message: "File deleted successfully"
-    });
-  } catch (err) {
-    next(err);
+      res.json({
+        success: true,
+        message: "File deleted successfully",
+      });
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
 export default router;

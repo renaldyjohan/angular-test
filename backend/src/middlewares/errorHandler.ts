@@ -1,7 +1,13 @@
 import { Request, Response, NextFunction } from "express";
+import { HttpError } from "../types/errors";
 
-export function errorHandler(err: any, req: Request, res: Response, next: NextFunction) {
-  const statusCode = err.status || 500;
+export function errorHandler(
+  err: HttpError,
+  _req: Request,
+  res: Response,
+  _next: NextFunction
+) {
+  const statusCode = err.status ?? 500;
 
   console.error("Error:", err);
 
@@ -9,6 +15,6 @@ export function errorHandler(err: any, req: Request, res: Response, next: NextFu
     success: false,
     code: statusCode,
     message: err.message || "Internal Server Error",
-    error: process.env.NODE_ENV === "development" ? err.stack : undefined
+    error: process.env.NODE_ENV === "development" ? err.stack : undefined,
   });
 }
